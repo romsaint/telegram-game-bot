@@ -14,7 +14,8 @@
     "mongodb": "^6.16.0",
     "ngrok": "^5.0.0-beta.2",
     "node-telegram-bot-api": "^0.66.0",
-    "unique-random": "^4.0.0"
+    "unique-random": "^4.0.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/dotenv": "^8.2.3",

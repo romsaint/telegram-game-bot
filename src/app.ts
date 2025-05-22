@@ -1,59 +1,28 @@
 import { ConfigSerivce } from './config/config.service'
-import TelegramBot, { Message } from 'node-telegram-bot-api';
-import { distributeByLevel } from './utils/distributeByLevel';
-import { levels } from './consts/levels.const';
+import TelegramBot from 'node-telegram-bot-api';
+import { onStart } from './botHandlers/onStart';
+import { onText } from './botHandlers/onText';
+import { onQuery } from './botHandlers/onQuery';
+import { onDeposit } from './botHandlers/onDeposit';
+import { mongoClient } from './db/mongo/mongoClient';
 
 const config = new ConfigSerivce()
 const token = config.get('TOKEN')
 
-const bot = new TelegramBot(token, { polling: true })
+export const bot = new TelegramBot(token, { polling: true })
 
+async function connectMongo() {
+    await mongoClient.connect()
+}
+connectMongo()
 
 bot.setMyCommands([
     { command: "start", description: "Play!" },
     { command: "deposit", description: "Money money money" },
 ])
 
-bot.onText(/\/start/, async (msg: Message) => {
-    const chatId = msg.from?.id
+bot.onText(/\/start/, onStart)
 
-    // await mongoClient.connect()
-    // const users = await mongoClient.db().collection('users')
-    // users.findOne({$where: {'s': 1}})
-
-    if (!chatId) {
-        return
-    }
-    bot.sendMessage(chatId, 'Выбери уровень сложности', {
-        reply_markup: {
-            inline_keyboard: [[{ text: levels[0], callback_data: levels[0] }], [{ text: levels[1], callback_data: levels[1] }], [{ text: levels[2], callback_data: levels[2] }]]
-        }
-    })
-})
-
-bot.onText(/\/deposit/, (msg: Message) => {
-
-})
-
-bot.on('callback_query', query => {
-    const data = query.data
-    const chatId = query.from.id
-    if (data?.includes('зараженных')) {
-        const game = distributeByLevel(chatId, data)
-        if (game) {
-            bot.sendMessage(chatId, `Выбери одно эмодзи, но учти - есть ${game?.infected} зараженных!`, {
-                reply_markup: {
-                    inline_keyboard: game.inline_keyboard
-                }
-            })
-        } else {
-            bot.sendMessage(chatId, 'ERROR')
-        }
-    }
-    if(data?.split('-')[2] === 'infected') {
-        bot.sendMessage(chatId, 'Вы проиграли :(')
-    }
-    if(data?.split('-')[2] === 'healthy') {
-        bot.sendMessage(chatId, 'Вы выиграли!! Вы можете продолжить играть')
-    }
-})
+bot.onText(/\/deposit/, onDeposit)
+bot.on('text', onText)
+bot.on('callback_query', onQuery)
