@@ -9,7 +9,7 @@ export async function contribution(msg: Message) {
     const data = msg.text
     if (!userId || !data) return
 
-    const money = parseInt(data)
+    const money = Number(data)
     const key = `${userId}-start`
 
     if (await redisClient.get(key) !== 'DEPOSIT_STATE') {
