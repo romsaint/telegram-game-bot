@@ -1,1 +1,1 @@
-export const noTextArr = ['/deposit', '/start', '/balance', '/stat']
+export const noTextArr = ['/deposit', '/start', '/balance', '/stat', '/withdrawal']

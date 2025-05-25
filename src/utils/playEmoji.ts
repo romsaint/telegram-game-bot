@@ -30,7 +30,7 @@ export function playEmoji(userId: number, level: number, id: string): { inline_k
                 inline_keyboard.push([{ text: emoji, callback_data: `${userId}-${emoji}-healthy-${id}` }])
             }
         }
-
+        console.log(infectedEmoji)
         return { inline_keyboard, infected: infected.length, infectedEmoji}
     } catch (e) {
         return null

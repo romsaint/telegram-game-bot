@@ -4,10 +4,12 @@ import { bot } from "../app"
 import { redisClient } from "../db/redis/redisClient"
 import { CallbackQuery } from "node-telegram-bot-api"
 import { deleteState } from "../utils/deleteState"
-import { distibuteMultiply } from "../utils/distibuteMultiply"
 import { mongoClient } from "../db/mongo/mongoClient"
 import { IUser } from "../interfaces/user.interface"
 import { deposit } from "../utils/deposit"
+import { exitWin } from "../utils/exitWin"
+import { onHealthy } from "../utils/onHealthy"
+import { onInfected } from "../utils/onInfected"
 
 export async function onQuery(query: CallbackQuery) {
     const data = query.data
@@ -22,7 +24,7 @@ export async function onQuery(query: CallbackQuery) {
         if (game) {
             await redisClient.set(`${userId}-level-game`, data)
             await redisClient.set(`${userId}-infected-emoji`, Buffer.from(JSON.stringify(game.infectedEmoji)))
-             
+
             await bot.sendMessage(userId, `Выбери одно эмодзи, но учти - есть ${game?.infected} зараженных!`, {
                 reply_markup: {
                     inline_keyboard: game.inline_keyboard
@@ -56,26 +58,7 @@ export async function onQuery(query: CallbackQuery) {
         return
     }
     if (data === 'EXIT-WIN') {
-        const winMoneyData = await redisClient.get(`${userId}-money`)
-        const gameData = await redisClient.get(`${userId}-game`)
-        const emoji = await redisClient.get(`${userId}-infected-emoji`) as Buffer | null
-      
-        if (!winMoneyData || !gameData || !emoji) {
-            bot.sendMessage(userId, `ОШИБКА`)
-            
-            return
-        }
-        const infectedEmojiArr = JSON.parse(emoji.toString('utf8')) as string[]
-    
-        const winMoney = Math.round(Number(winMoneyData) * Number(gameData))
-        await collection.updateOne({ id: userId }, { $inc: { balance: winMoney } })
-
-        bot.sendMessage(userId, `Вы выиграли ${winMoney}`)
-        bot.sendMessage(userId, `Зараженные емодзи - ${infectedEmojiArr.join(' ')}`)
-
-        await deleteState(userId)
-
-        return
+        await exitWin(userId, collection)
     }
 
     if (data?.split('-')[2] === 'infected' || data?.split('-')[2] === 'healthy') {
@@ -88,80 +71,9 @@ export async function onQuery(query: CallbackQuery) {
 
     }
     if (data?.split('-')[2] === 'infected') {
-        const spendMoney = await redisClient.get(`${userId}-money`)
-        const emoji = await redisClient.get(`${userId}-infected-emoji`) as Buffer | null
-
-        if(!emoji) {
-            bot.sendMessage(userId, 'ОШИБКА')
-            return
-        }
-        const infectedEmojiArr = JSON.parse(emoji.toString('utf8')) as string[]
-
-        if (spendMoney) {
-            await collection.updateOne(
-                { id: userId },
-                { 
-                    $inc: { 
-                        loseSum: Number(spendMoney),
-                        gameCount: 1
-                    }
-                }
-            )
-        }
-        deleteState(userId)
-        
-        bot.sendMessage(userId, 'Вы проиграли :(')
-        bot.sendMessage(userId, `Зараженные емодзи - ${infectedEmojiArr.join(' ')}`)
-        return
+        await onInfected(userId, collection, data)
     }
     if (data?.split('-')[2] === 'healthy') {
-        const gameData = await redisClient.get(`${userId}-game`)
-        const level = await redisClient.get(`${userId}-level-game`)
-        const emoji = data?.split('-')[1]
-        const clicked = await redisClient.get(`${userId}-emoji-clicked`)
-   
-        if(clicked && clicked.toString().includes(emoji)) {
-             bot.sendMessage(userId, 'Вы уже нажимали на него')
-            return
-        }
-
-        if(clicked) {
-            await redisClient.set(`${userId}-emoji-clicked`, Buffer.from(`${emoji}${clicked}`))
-        }else{
-            await redisClient.set(`${userId}-emoji-clicked`, Buffer.from(`${emoji}`))
-        }
-        
-        if (!gameData || !level) {
-            bot.sendMessage(userId, 'ЧТО-ТО НЕ ТАК')
-            return
-        }
-
-        await distibuteMultiply(gameData, userId, level)
-        const balance = await redisClient.get(`${userId}-game`)
-        const spendMoney = await redisClient.get(`${userId}-money`)
-   
-        if (!balance || !spendMoney) {
-            bot.sendMessage(userId, 'ОШИБКА')
-            return
-        }
-        const win = Math.round(Number(balance) * Number(spendMoney))
-        const poorWin = (Number(balance) * Number(spendMoney)) - Number(spendMoney)
-
-        await collection.updateOne(
-            { id: userId },
-            { 
-                $inc: { 
-                    winSum: poorWin,
-                    gameCount: 1
-                }
-            }
-        )
-      
-        bot.sendMessage(userId, `Вы выиграли!! ваш баланс - ${win} Вы можете продолжить играть либо выйти с выигрышем`, {
-            reply_markup: {
-                inline_keyboard: [[{ text: 'Выйти', callback_data: "EXIT-WIN" }]]
-            }
-        })
-        return
+        await onHealthy(userId, collection, data)
     }
 }

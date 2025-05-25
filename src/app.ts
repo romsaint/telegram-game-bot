@@ -10,6 +10,8 @@ import { IUser } from './interfaces/user.interface';
 import { redisClient } from './db/redis/redisClient';
 import { onStat } from './botHandlers/onStat';
 import { onWithdrawal } from './botHandlers/onWithdrawal';
+import { preCheckoutQuery } from './botHandlers/preCheckoutQuery';
+import { successfulPayment } from './botHandlers/successfulPayment';
 
 const config = new ConfigSerivce()
 const token = config.get('TOKEN')
@@ -39,34 +41,7 @@ bot.on('text', onText)
 bot.on('callback_query', onQuery)
 
 // Обработка pre_checkout_query (подтверждение оплаты)
-bot.on('pre_checkout_query', (query) => {
-  bot.answerPreCheckoutQuery(query.id, true);
-});
+bot.on('pre_checkout_query', preCheckoutQuery);
 
 // Обработка успешного платежа
-bot.on('successful_payment', async (msg) => {
-  const userId = msg.from?.id;
-  if (!userId) return
-  try {
-    if (msg.successful_payment) {
-      const amount = msg.successful_payment.total_amount / 100; // сумма в рублях
-
-      const usersCollection = mongoClient.db('casino').collection<IUser>('users')
-
-      await usersCollection.updateOne(
-        { id: userId },
-        { $inc: { balance: amount } }
-      );
-      const user = await usersCollection.findOne({ id: userId }, { projection: { balance: 1 } })
-      if (!user) {
-        return
-      }
-      const balance = user.balance
-      await redisClient.del(`${userId}`)
-      
-      bot.sendMessage(userId, `Платеж успешно зачислен! Ваш баланс - ${balance}`);
-    }
-  } catch (e) {
-    bot.sendMessage(userId, 'ОШИБКА')
-  }
-});
+bot.on('successful_payment', successfulPayment);

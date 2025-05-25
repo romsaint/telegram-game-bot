@@ -8,17 +8,9 @@ import { deleteState } from "../utils/deleteState"
 
 export async function onStart(msg: Message) {
     const userId = msg.from?.id
+   
     if (!userId) return
-    const users = await redisClient.get('users')
-
-    if (users) {
-        if (!users.includes(`${userId}`)) {
-            await redisClient.set('users', `${users};${userId}`)
-        }
-    } else {
-        await redisClient.set('users', `${userId}`)
-    }
-
+    
     try {
         const user: IUser = {
             balance: 0,
